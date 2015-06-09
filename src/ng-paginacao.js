@@ -4,48 +4,64 @@
 {
     angular
         .module('alt.ng-paginacao', [])
+        .constant('ALT_CLASSE_PAGINAS', '.alt-paginacao-numero-pagina')
         .provider('AltPaginacao', function() {
             this.$get = ['$http', '$q', function($http, $q) {
-                var FernandaPaginacao = function(pag) {
-                    this.url = undefined;
-                    this.pagina = 1;
-                    this.maximoPaginasExibidas = 10;
-                    this.itensPorPagina = 10;
-                    this.dados = [];
 
-                    angular.extend(this, pag);
+                var PAGINA_DEFAULT = 1;
+                var MAX_PAGINAS_EXIBIDAS_DEFAULT = 10;
+                var MAX_ITENS_POR_PAGINA_DEFAULT = 10;
+
+                var AltPaginacao = function(opt) {
+                    this.url = undefined;
+                    this.pagina = PAGINA_DEFAULT;
+                    this.ordenacao = undefined;
+                    this.maximoPaginasExibidas = MAX_PAGINAS_EXIBIDAS_DEFAULT;
+                    this.itensPorPagina = MAX_ITENS_POR_PAGINA_DEFAULT;
+
+                    angular.extend(this, opt);
                 };
 
-                FernandaPaginacao.prototype.buscar = function(opts) {
-                    var _onSuccess = function(informacoes) {
-                        return informacoes.data;
-                    };
+                AltPaginacao.prototype.buscar = function(opts) {
+                    angular.extend(this, opts);
 
-                    var _onError = function(erro) {
-                        return $q.reject(erro);
-                    };
-
-                    var _pagina = '?pagina=' + opts.pagina || this.pagina;
-                    var _ordenacao = opts.ordenacao ? '?ordenacao=' + opts.ordenacao : '';
-                    var _filtro = opts.filtro ? '?filtro=' + opts.filtro : '';
+                    var _pagina = '?pagina=' + (this.pagina || PAGINA_DEFAULT);
+                    var _ordenacao = this.ordenacao ? '&ordenacao=' + this.ordenacao : '';
 
                     return $http
-                            .get(this.url + _pagina + _ordenacao + _filtro)
-                            .then(_onSuccess)
-                            .catch(_onError);
+                            .get(this.url + _pagina + _ordenacao)
+                            .then(function(info) {
+                               return info.data;
+                            })
+                            .catch(function(erro) {
+                                return $q.reject(erro);
+                            });
                 };
 
-                return FernandaPaginacao;
+                return AltPaginacao;
             }];
         })
-        .directive('altPaginacao', [function() {
+        .directive('altAtiva', [function() {
+            return function(scope, element, attrs) {
+              element.on('click', function() {
+                  element.parent().children().removeClass('ativa');
+                  element.addClass('ativa');
+              })
+            };
+        }])
+        .directive('altPaginacao', ['ALT_CLASSE_PAGINAS', function(ALT_CLASSE_PAGINAS) {
             var _template = '<div>\
-                                <span ng-repeat="nPagina in numeroPaginas" ng-bind="nPagina"></span>\
+                                <div ng-if="numeroPaginas.length">\
+                                    <span ng-if="maisDeUmaPagina"><<</span>\
+                                    <span ng-repeat="nPagina in numeroPaginas" class=' + ALT_CLASSE_PAGINAS + ' ng-bind="nPagina" alt-ativa></span>\
+                                    <span ng-if="maisDeUmaPagina">>></span>\
+                                </div>\
                             </div>';
 
             var _link = function(scope, element, attrs) {
                 element.on('click', function(ev) {
-                    scope.atualizaPaginacao({pagina: ev.target.innerText});
+                    var _obj = {obj: {pagina: ev.target.innerText, ordenacao: scope.ordem.ordenacao}};
+                    scope.atualizaPaginacao(_obj);
                 });
 
                 scope.opcoes = {};
@@ -56,6 +72,7 @@
                     var _obj = angular.fromJson(obj);
 
                     var _numeroPaginas = Math.ceil(_obj.totalElementos / _obj.itensPorPagina);
+                    scope.maisDeUmaPagina = _numeroPaginas > 1;
 
                     for (var i = 1; i <= _numeroPaginas; i ++) {
                         scope.numeroPaginas.push(i);
@@ -63,7 +80,7 @@
                 });
             };
 
-            var _scope = {atualizaPaginacao: '&', opcoes: '@'};
+            var _scope = {atualizaPaginacao: '&', opcoes: '@', ordem: '='};
 
             var _restrict = 'AE';
 
@@ -72,6 +89,28 @@
                 template: _template,
                 scope: _scope,
                 link: _link
+            };
+        }])
+        .directive('altOrdenacao', [function() {
+            var _restrict = 'A';
+
+            var _link = function(scope, element, attrs) {
+
+                var _buscaPor = undefined;
+
+                element.on('click', function() {
+                    _buscaPor = _buscaPor === scope.asc ? scope.desc : scope.asc;
+
+                    scope.atualizaOrdenacao({obj: {pagina: scope.paginacao.pagina, ordenacao: _buscaPor}});
+                });
+            };
+
+            var _scope = {asc: '@', desc: '@', atualizaOrdenacao: '&', paginacao: '='};
+
+            return {
+                restrict: _restrict,
+                link: _link,
+                scope: _scope
             };
         }]);
 }(window.angular));

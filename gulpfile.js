@@ -24,7 +24,7 @@ gulp.task('test', function(done)
 {
     var _opts = {
                   configFile: __dirname + '/karma.conf.js',
-                  singleRun: true,
+                  singleRun: false,
                   browsers: ['Chrome']
                };
 
